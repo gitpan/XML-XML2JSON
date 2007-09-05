@@ -1,0 +1,7 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/XML-XML2JSON.t
+lib/XML/XML2JSON.pm
+META.yml                                 Module meta-data (added by MakeMaker)

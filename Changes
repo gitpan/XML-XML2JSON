@@ -1,0 +1,6 @@
+Revision history for Perl extension XML::XML2JSON.
+
+0.01  Tue Sep  4 11:43:36 2007
+	- original version; created by h2xs 1.23 with options
+		-A -X -n XML::XML2JSON -b 5.6.0
+
