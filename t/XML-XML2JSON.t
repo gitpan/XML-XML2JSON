@@ -24,6 +24,7 @@ my $FoundModules = 0;
 $FoundModules++ if &check_module('JSON::Syck');
 $FoundModules++ if &check_module('JSON::XS');
 $FoundModules++ if &check_module('JSON');
+$FoundModules++ if &check_module('JSON::DWIW');
 
 diag "compatible JSON modules found: $FoundModules";
 

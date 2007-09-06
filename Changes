@@ -1,6 +1,12 @@
 Revision history for Perl extension XML::XML2JSON.
 
-0.01  Tue Sep  4 11:43:36 2007
-	- original version; created by h2xs 1.23 with options
-		-A -X -n XML::XML2JSON -b 5.6.0
+0.02  Tue Sep  6
+	- Fixed a bug where a JSON module was not auto-loading correctly
+	- Added the json2xml method
+	- Added an alias method for convert called xml2json
+	- Added support for JSON::DWIW
+	- Added attribute_prefix option
+	- Added content_key option
 
+0.01  Tue Sep  4
+	- original version

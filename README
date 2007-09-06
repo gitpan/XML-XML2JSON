@@ -1,20 +1,20 @@
-XML-XML2JSON version 0.01
-=====================
+XML-XML2JSON version 0.02
+=========================
 
 INSTALLATION
 
 To install this module type the following:
 
-   perl Makefile.PL
-   make
-   make test
-   make install
+	perl Makefile.PL
+	make
+	make test
+	make install
 
 DEPENDENCIES
 
 This module requires these other modules and libraries:
 
-   XML::LibXML;
+	XML::LibXML;
    
 You must also have a JSON module installed.
 Currently supports:
@@ -22,6 +22,7 @@ Currently supports:
 	JSON::Syck 
 	JSON::XS 
 	JSON
+	JSON::DWIW
 
 COPYRIGHT AND LICENCE
 
