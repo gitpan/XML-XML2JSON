@@ -1,10 +1,10 @@
 package XML::XML2JSON;
 use strict;
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use XML::LibXML;
 
-our	$XMLParser ||= XML::LibXML->new();
+our	$XMLPARSER ||= XML::LibXML->new();
 
 =head1 NAME
 
@@ -12,7 +12,7 @@ XML::XML2JSON - Convert XML into JSON (and back again) using XML::LibXML
 
 =head1 SYNOPSIS
 
-	use XML::JSON;
+	use XML::XML2JSON;
 	
 	my $XML = '<test><element foo="bar"/></test>';
 	
@@ -21,6 +21,8 @@ XML::XML2JSON - Convert XML into JSON (and back again) using XML::LibXML
 	my $JSON = $XML2JSON->convert($XML);
 	
 	print $JSON;
+	
+	my $RestoredXML = $XML2JSON->json2xml($JSON);
 
 =head1 DESCRIPTION
 
@@ -28,19 +30,35 @@ I used Google for inspiration: http://code.google.com/apis/gdata/json.html
 
 In short:
 
-	* The response is represented as a JSON object; each nested element or attribute is represented as a name/value property of the object.
-	* Attributes are converted to String properties.
-	* Attribute names are prefixed with "@" so that they dont conflict with child elements of the same name.
-	* Child elements are converted to Object properties.
-	* Text values of tags are converted to $t properties.
+=over 4
+
+=item * The response is represented as a JSON object; each nested element or attribute is represented as a name/value property of the object.
+
+=item * Attributes are converted to String properties.
+
+=item * Attribute names are prefixed with "@" so that they dont conflict with child elements of the same name.
+
+=item * Child elements are converted to Object properties.
+
+=item * Text values of tags are converted to $t properties.
+
+=back
 
 Namespace
 
-	* If an element has a namespace alias, the alias and element are concatenated using "$". For example, ns:element becomes ns$element.
+=over 4
+
+=item * If an element has a namespace alias, the alias and element are concatenated using "$". For example, ns:element becomes ns$element.
+
+=back
 
 XML
 
-	* XML version and encoding attributes are converted to attribute version and encoding of the root element, respectively.
+=over 4
+
+=item * XML version and encoding attributes are converted to attribute version and encoding of the root element, respectively.
+
+=back
 
 =cut
 
@@ -52,28 +70,46 @@ Creates a new XML::XML2JSON object.
 
 It supports the following arguments:
 
-	module: this is the JSON module that you want to use. 
-	By default it will use the first one it finds, in the following order: JSON::Syck, JSON::XS, JSON, JSON::DWIW
+=head3 module
 
-	private_elements: An arraryref of element names that should be removed after calling the sanitize method.
-	Children of the elements will be removed as well.
-	
-	empty_elements: An arrayref of element names that should have their attributes and text content
-	removed after calling the sanitize method. This leaves any children of the elements intact.
-	
-	private_attributes: An arrayref of attribute names that should be removed after calling the sanitize method.
+This is the JSON module that you want to use. 
+By default it will use the first one it finds, in the following order: JSON::Syck, JSON::XS, JSON, JSON::DWIW
 
-	attribute_prefix: All attributes will be prefixed by this when converting to JSON. This is "@" by default.
-	You can set this to "", but if you do, any attributes that conflict with a child element name will be lost.
-	
-	content_key: This is the name of the hash key that text content will be added to. This is "$t" by default.
-	
-	force_array: If set to true, elements that appear only once can be 
-	accessed directly by its hash, instead of being added to an array.
-	
-	pretty: If set to true, output will be formatted to be easier to read whenever possible.
-	
-	debug: If set to true, will print warn messages to describe what it is doing.
+=head3 private_elements
+
+An arraryref of element names that should be removed after calling the sanitize method.
+Children of the elements will be removed as well.
+
+=head3 empty_elements
+
+An arrayref of element names that should have their attributes and text content
+removed after calling the sanitize method. This leaves any children of the elements intact.
+
+=head3 private_attributes
+
+An arrayref of attribute names that should be removed after calling the sanitize method.
+
+=head3 attribute_prefix
+
+All attributes will be prefixed by this when converting to JSON. This is "@" by default.
+You can set this to "", but if you do, any attributes that conflict with a child element name will be lost.
+
+=head3 content_key
+
+This is the name of the hash key that text content will be added to. This is "$t" by default.
+
+=head3 force_array
+
+If set to true, elements that appear only once can be 
+accessed directly by its hash, instead of being added to an array.
+
+=head3 pretty
+
+If set to true, output will be formatted to be easier to read whenever possible.
+
+=head3 debug
+
+If set to true, will print warn messages to describe what it is doing.
 
 =cut
 
@@ -100,7 +136,10 @@ sub _init
   if ($Args{module})
   {
   	my $OK = 0;
-  	map { $OK=1 if $_ eq $Args{module} } @Modules;
+  	for (@Modules)
+  	{ 
+  		$OK = 1 if $_ eq $Args{module};
+  	}
   	die "unsupported module: $Args{module}" unless $OK;
   	@Modules = ($Args{module});
   }
@@ -147,6 +186,8 @@ sub _init
   # names
   $Self->{attribute_prefix} = defined $Args{attribute_prefix} ? $Args{attribute_prefix} : '@';
   $Self->{content_key} = defined $Args{content_key} ? $Args{content_key} : '$t';
+  
+  return;
 }
 
 =head2 convert
@@ -253,7 +294,7 @@ sub xml2obj
 	my ($Self, $XML) = @_;
 	
 	# this is the response element
-	my $Doc = $XMLParser->parse_string( $XML );
+	my $Doc = $XMLPARSER->parse_string( $XML );
 	my $Root = $Doc->documentElement;
 	
 	# set the root element name
@@ -557,19 +598,35 @@ would be returned by the xml2obj method.
 
 In short: 
 
-	* The root hashref may only have a single hashref key. That key will become the xml document's root.
-	* A hashref will be converted to an element. 
-	* An arraysref of hashrefs will be converted into multiple child elements. Their names will be set to the name of the arrayref's hash key.
-	* If an attribute is prefixed by an "@", the "@" will be removed.
-	* A hashkey named "$t" will be converted into text content for the current element.
+=over 4
+
+=item * The root hashref may only have a single hashref key. That key will become the xml document's root.
+
+=item * A hashref will be converted to an element.
+
+=item * An arraysref of hashrefs will be converted into multiple child elements. Their names will be set to the name of the arrayref's hash key.
+
+=item * If an attribute is prefixed by an "@", the "@" will be removed.
+
+=item * A hashkey named "$t" will be converted into text content for the current element.
+
+=back
 
 Namespace
 
-	* If a namespace alias has a "$", it will be replaced using ":". For example, ns$element becomes ns:element.
+=over 4
+
+=item * If a namespace alias has a "$", it will be replaced using ":". For example, ns$element becomes ns:element.
+
+=back
 
 Caveats:
 
-	* The order of child elements and attributes cannot be determined.
+=over 4
+
+=item * The order of child elements and attributes cannot be determined.
+
+=back
 
 =cut
 
@@ -582,7 +639,7 @@ sub obj2xml
 	my $Version  = $Obj->{$Self->{attribute_prefix} . 'version'}  || $Obj->{'version'}  || '1.0';
 	my $Encoding = $Obj->{$Self->{attribute_prefix} . 'encoding'} || $Obj->{'encoding'} || 'UTF-8';
 	
-	my $Dom = $XMLParser->createDocument($Version, $Encoding);
+	my $Dom = $XMLPARSER->createDocument($Version, $Encoding);
 	
 	my $GotRoot = 0;
 	
@@ -682,7 +739,7 @@ sub _process_element_hash
 
 Ken Prows - perl(AT)xev.net
 
-=head1 COPYRIGHT
+=head1 COPYRIGHT & LICENSE
 
 Copyright (C) 2007 Ken Prows
 

@@ -5,11 +5,15 @@
 
 use strict;
 
+use CPAN;
+
 use Test::More tests => 2;
 
 BEGIN { use_ok('XML::XML2JSON') };
 
 #########################
+
+my @Modules = qw(JSON::Syck JSON::XS JSON JSON::DWIW);
 
 my $XML = qq|<?xml version="1.0" encoding="UTF-8" ?>
 <test>
@@ -21,10 +25,10 @@ diag "\nChecking for compatible JSON modules (you need at least one):\n";
 
 my $FoundModules = 0;
 
-$FoundModules++ if &check_module('JSON::Syck');
-$FoundModules++ if &check_module('JSON::XS');
-$FoundModules++ if &check_module('JSON');
-$FoundModules++ if &check_module('JSON::DWIW');
+foreach my $Module (@Modules)
+{
+	$FoundModules++ if &check_module($Module);
+}
 
 diag "compatible JSON modules found: $FoundModules";
 
@@ -46,7 +50,7 @@ sub check_module
 	{
 		eval
 		{
-			my $XML2JSON = XML::XML2JSON->new( module=>$Module );
+			my $XML2JSON = XML::XML2JSON->new( module=>$Module, debug=>1 );
 			my $JSON = $XML2JSON->convert($XML);
 			
 			# check attribute

@@ -1,6 +1,10 @@
 Revision history for Perl extension XML::XML2JSON.
 
-0.02  Tue Sep  6
+0.03  Sep  10
+	- Makefile.PL now uses Module::Install
+	- Fixed a couple typos in the pod
+
+0.02  Sep  6
 	- Fixed a bug where a JSON module was not auto-loading correctly
 	- Added the json2xml method
 	- Added an alias method for convert called xml2json
@@ -8,5 +12,5 @@ Revision history for Perl extension XML::XML2JSON.
 	- Added attribute_prefix option
 	- Added content_key option
 
-0.01  Tue Sep  4
+0.01  Sep  4
 	- original version

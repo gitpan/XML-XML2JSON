@@ -1,12 +1,34 @@
-use 5.006;
-use ExtUtils::MakeMaker;
-# See lib/ExtUtils/MakeMaker.pm for details of how to influence
-# the contents of the Makefile that is written.
-WriteMakefile(
-    NAME              => 'XML::XML2JSON',
-    VERSION_FROM      => 'lib/XML/XML2JSON.pm', # finds $VERSION
-    PREREQ_PM         => { 'XML::LibXML'=>1.59 }, # e.g., Module::Name => 1.1
-    ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
-      (ABSTRACT_FROM  => 'lib/XML/XML2JSON.pm', # retrieve abstract from module
-       AUTHOR         => 'Ken Prows') : ()),
-);
+# Load the Module::Install bundled in ./inc/
+use inc::Module::Install;
+
+# Define metadata
+name 'XML-XML2JSON';
+all_from 'lib/XML/XML2JSON.pm';
+
+# Required dependencies
+requires 'XML::LibXML' => '1.59';
+
+#
+# Require at least one of the below JSON modules
+#
+feature 'JSON::Syck',
+  -default => 1,
+  'JSON::Syck' => '0';
+
+feature 'JSON::XS',
+  -default => 0,
+  'JSON::XS' => '0';
+
+feature 'JSON',
+  -default => 0,
+  'JSON' => '0';
+
+feature 'JSON::DWIW',
+  -default => 0,
+  'JSON::DWIW' => '0';
+
+# Build dependencies
+build_requires 'Test::More' => '0';
+
+auto_install;
+WriteAll;

@@ -1,11 +1,11 @@
-XML-XML2JSON version 0.02
+XML-XML2JSON version 0.03
 =========================
 
 INSTALLATION
 
 To install this module type the following:
 
-	perl Makefile.PL
+	perl Makefile.PL --defaultdeps
 	make
 	make test
 	make install
