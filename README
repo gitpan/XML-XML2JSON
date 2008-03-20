@@ -1,5 +1,5 @@
-XML-XML2JSON version 0.03
-=========================
+XML-XML2JSON
+============
 
 INSTALLATION
 
@@ -24,9 +24,9 @@ Currently supports:
 	JSON
 	JSON::DWIW
 
-COPYRIGHT AND LICENCE
+COPYRIGHT AND LICENSE
 
-Copyright (C) 2007 Ken Prows
+Copyright (C) 2007-2008 Ken Prows
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.6.0 or,

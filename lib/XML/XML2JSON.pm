@@ -1,10 +1,11 @@
 package XML::XML2JSON;
 use strict;
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
+use Carp;
 use XML::LibXML;
 
-our	$XMLPARSER ||= XML::LibXML->new();
+our $XMLPARSER ||= XML::LibXML->new();
 
 =head1 NAME
 
@@ -115,79 +116,78 @@ If set to true, will print warn messages to describe what it is doing.
 
 sub new
 {
-  my $Class = shift;
-  my $Self = {};
-  bless $Self, $Class;
-  $Self->_init(@_);
-  return $Self;
+	my $Class = shift;
+	my $Self  = {};
+	bless $Self, $Class;
+	$Self->_init(@_);
+	return $Self;
 }
 
 sub _init
 {
-  my $Self = shift;
-  my %Args = @_;
-  
-  #
-  # load JSON module
-  #
-	
-  my @Modules = qw(JSON::Syck JSON::XS JSON JSON::DWIW);
-  
-  if ($Args{module})
-  {
-  	my $OK = 0;
-  	for (@Modules)
-  	{ 
-  		$OK = 1 if $_ eq $Args{module};
-  	}
-  	die "unsupported module: $Args{module}" unless $OK;
-  	@Modules = ($Args{module});
-  }
-  
-  $Self->{_loaded_module} = "";
-  
-  do
-  {
-  	my $Module = shift @Modules;
-  	
-  	last unless $Module;
-  	
-  	eval "use $Module; 1;";
-  	$Self->{_loaded_module} = $Module unless $@;
-  }
-  until ($Self->{_loaded_module});
-  
-  die "cannot find a suitable JSON module" unless $Self->{_loaded_module};
-  
-  # sanitize options
-  $Self->{private_elements} = $Args{private_elements} ? $Args{private_elements} : [];
-  $Self->{empty_elements} = $Args{empty_elements} ? $Args{empty_elements} : [];
-  $Self->{private_attributes} = $Args{private_attributes} ? $Args{private_attributes} : [];
-  
-  # element names must account for the : -> $ switch
-  for (my $i = 0; $i < @{$Self->{private_elements}}; $i++)
-  {
-  	$Self->{private_elements}->[$i] =~ s/([^^])\:/$1\$/;
-  }
-  for (my $i = 0; $i < @{$Self->{empty_elements}}; $i++)
-  {
-  	$Self->{empty_elements}->[$i] =~ s/([^^])\:/$1\$/;
-  }
-  
-  # force arrays (this turns off array folding)
-  $Self->{force_array} = $Args{force_array} ? 1 : 0;
-  
-  # use pretty printing when possible
-  $Self->{pretty} = $Args{pretty} ? 1 : 0;
-  
-  # debug mode
-  $Self->{debug} = $Args{debug} ? 1 : 0;
-  
-  # names
-  $Self->{attribute_prefix} = defined $Args{attribute_prefix} ? $Args{attribute_prefix} : '@';
-  $Self->{content_key} = defined $Args{content_key} ? $Args{content_key} : '$t';
-  
-  return;
+	my $Self = shift;
+	my %Args = @_;
+
+	#
+	# load JSON module
+	#
+
+	my @Modules = qw(JSON::Syck JSON::XS JSON JSON::DWIW);
+
+	if ( $Args{module} )
+	{
+		my $OK = 0;
+		for (@Modules)
+		{
+			$OK = 1 if $_ eq $Args{module};
+		}
+		croak "Unsupported module: $Args{module}" unless $OK;
+		@Modules = ( $Args{module} );
+	}
+
+	$Self->{_loaded_module} = "";
+
+	do
+	{
+		my $Module = shift @Modules;
+
+		last unless $Module;
+
+		eval "use $Module (); 1;";
+		$Self->{_loaded_module} = $Module unless $@;
+	} until ( $Self->{_loaded_module} );
+
+	croak "Cannot find a suitable JSON module" unless $Self->{_loaded_module};
+
+	# sanitize options
+	$Self->{private_elements}   = $Args{private_elements}   ? $Args{private_elements}   : [];
+	$Self->{empty_elements}     = $Args{empty_elements}     ? $Args{empty_elements}     : [];
+	$Self->{private_attributes} = $Args{private_attributes} ? $Args{private_attributes} : [];
+
+	# element names must account for the : -> $ switch
+	for ( my $i = 0 ; $i < @{ $Self->{private_elements} } ; $i++ )
+	{
+		$Self->{private_elements}->[$i] =~ s/([^^])\:/$1\$/;
+	}
+	for ( my $i = 0 ; $i < @{ $Self->{empty_elements} } ; $i++ )
+	{
+		$Self->{empty_elements}->[$i] =~ s/([^^])\:/$1\$/;
+	}
+
+	# force arrays (this turns off array folding)
+	$Self->{force_array} = $Args{force_array} ? 1 : 0;
+
+	# use pretty printing when possible
+	$Self->{pretty} = $Args{pretty} ? 1 : 0;
+
+	# debug mode
+	$Self->{debug} = $Args{debug} ? 1 : 0;
+
+	# names
+	$Self->{attribute_prefix} = defined $Args{attribute_prefix} ? $Args{attribute_prefix} : '@';
+	$Self->{content_key}      = defined $Args{content_key}      ? $Args{content_key}      : '$t';
+
+	return;
 }
 
 =head2 convert
@@ -205,17 +205,17 @@ Calling this method is the same as:
 
 sub convert
 {
-	my ($Self, $XML) = @_;
-	
+	my ( $Self, $XML ) = @_;
+
 	my $Obj = $Self->xml2obj($XML);
-	
-	if (@{$Self->{private_elements}} || @{$Self->{empty_elements}} || @{$Self->{private_attributes}})
+
+	if ( @{ $Self->{private_elements} } || @{ $Self->{empty_elements} } || @{ $Self->{private_attributes} } )
 	{
 		$Self->sanitize($Obj);
 	}
-	
+
 	my $JSON = $Self->obj2json($Obj);
-	
+
 	return $JSON;
 }
 
@@ -227,10 +227,10 @@ This is an alias for convert.
 
 sub xml2json
 {
-	my ($Self, $XML) = @_;
-	
+	my ( $Self, $XML ) = @_;
+
 	my $JSON = $Self->convert($XML);
-	
+
 	return $JSON;
 }
 
@@ -243,43 +243,100 @@ Return a string of equivalent JSON.
 
 sub obj2json
 {
-	my ($Self, $Obj) = @_;
-	
+	my ( $Self, $Obj ) = @_;
+
 	my $JSON = "";
-	
-	warn "converting obj to json using $Self->{_loaded_module}" if $Self->{debug};
-	
-	if ($Self->{_loaded_module} eq 'JSON::Syck')
+
+	carp "Converting obj to json using $Self->{_loaded_module}" if $Self->{debug};
+
+	if ( $Self->{_loaded_module} eq 'JSON::Syck' )
 	{
+
 		# this module does not have a "pretty" option
 		$JSON = JSON::Syck::Dump($Obj);
 	}
-	
-	if ($Self->{_loaded_module} eq 'JSON::XS')
+
+	if ( $Self->{_loaded_module} eq 'JSON::XS' )
 	{
-		$JSON = JSON::XS->new->utf8->pretty($Self->{pretty})->encode($Obj);
+		$JSON = JSON::XS->new->utf8->pretty( $Self->{pretty} )->encode($Obj);
 	}
-	
-	if ($Self->{_loaded_module} eq 'JSON')
+
+	if ( $Self->{_loaded_module} eq 'JSON' )
 	{
 		$JSON::UnMapping = 1;
-		
-		if ($Self->{pretty})
+
+		if ( $Self->{pretty} )
 		{
-			$JSON = objToJson($Obj, { autoconv => 0, pretty => 1, indent => 2 });
+			$JSON = JSON::to_json( $Obj, { pretty => 1, indent => 2 } );
 		}
 		else
 		{
-			$JSON = objToJson($Obj, { autoconv => 0 });
+			$JSON = JSON::to_json($Obj);
 		}
 	}
-	
-	if ($Self->{_loaded_module} eq 'JSON::DWIW')
+
+	if ( $Self->{_loaded_module} eq 'JSON::DWIW' )
 	{
-		$JSON = JSON::DWIW->to_json($Obj, { pretty => $Self->{pretty} });
+		$JSON = JSON::DWIW->to_json( $Obj, { pretty => $Self->{pretty} } );
 	}
-	
+
 	return $JSON;
+}
+
+=head2 dom2obj
+
+Takes an XML::LibXML::Document object as input.
+Returns an equivalent perl data structure.
+
+=cut
+
+sub dom2obj
+{
+	my ( $Self, $Doc ) = @_;
+
+	# this is the response element
+	my $Root = $Doc->documentElement;
+
+	# set the root element name
+	my $NodeName = $Root->nodeName;
+
+	# replace a ":" in the name with a "$"
+	$NodeName =~ s/([^^])\:/$1\$/;
+
+	# get the version and encoding of the xml doc
+	my $Version  = $Doc->version  || '1.0';
+	my $Encoding = $Doc->encoding || 'UTF-8';
+
+	# create the base objects
+	my $Obj = {};
+	my $RootObj = {    $Self->{attribute_prefix} .
+					  'version' => $Version,
+					$Self->{attribute_prefix} .
+					  'encoding' => $Encoding,
+					$NodeName => $Obj,
+	};
+
+	# grab any text content
+	my $Text = $Root->findvalue('text()');
+	$Text = undef unless $Text =~ /\S/;
+	$Obj->{ $Self->{content_key} } = $Text if $Text;
+
+	# process attributes
+	my @Attributes = $Root->findnodes('@*');
+	if (@Attributes)
+	{
+		foreach my $Attr (@Attributes)
+		{
+			my $AttrName  = $Attr->nodeName;
+			my $AttrValue = $Attr->nodeValue;
+
+			$Obj->{ $Self->{attribute_prefix} . $AttrName } = $AttrValue;
+		}
+	}
+
+	$Self->_process_children( $Root, $Obj );
+
+	return $RootObj;
 }
 
 =head2 xml2obj
@@ -291,141 +348,117 @@ Returns an equivalent perl data structure.
 
 sub xml2obj
 {
-	my ($Self, $XML) = @_;
-	
-	# this is the response element
-	my $Doc = $XMLPARSER->parse_string( $XML );
-	my $Root = $Doc->documentElement;
-	
-	# set the root element name
-	my $NodeName = $Root->nodeName;
-	# replace a ":" in the name with a "$"
-	$NodeName =~ s/([^^])\:/$1\$/;
-	
-	# get the version and encoding of the xml doc
-	my $Version = $Doc->version || '1.0';
-	my $Encoding = $Doc->encoding || 'UTF-8';
-	
-	# create the base objects
-	my $Obj = {};
-	my $RootObj = { 
-		$Self->{attribute_prefix} . 'version'	=>	$Version,
-  		$Self->{attribute_prefix} . 'encoding'	=>	$Encoding,
-		$NodeName	=>	$Obj,
-	};
-	
-	# grab any text content
-	my $Text = $Root->findvalue('text()');
-	$Text = undef unless $Text =~ /\S/;
-	$Obj->{$Self->{content_key}} = $Text if $Text;
-	
-	# process attributes
-	my @Attributes = $Root->findnodes('@*');
-	if (@Attributes)
-	{
-		foreach my $Attr (@Attributes)
-		{
-			my $AttrName = $Attr->nodeName;
-			my $AttrValue = $Attr->nodeValue;
-			
-			$Obj->{$Self->{attribute_prefix} . $AttrName} = $AttrValue;
-		}
-	}
-	
-	$Self->_process_children($Root, $Obj);
-	
-	return $RootObj;
+	my ( $Self, $XML ) = @_;
+
+	my $Doc = $XMLPARSER->parse_string($XML);
+
+	my $Obj = $Self->dom2obj($Doc);
+
+	return $Obj;
 }
 
 sub _process_children
 {
-	my ($Self, $CurrentElement, $CurrentObj) = @_;
-	
+	my ( $Self, $CurrentElement, $CurrentObj ) = @_;
+
 	my @Children = $CurrentElement->findnodes('*');
-	
+
 	foreach my $Child (@Children)
 	{
+
 		# this will contain the data for the current element (including its children)
 		my $ElementHash = {};
-		
+
 		# set the name of the element
 		my $NodeName = $Child->nodeName;
+
 		# replace a ":" in the name with a "$"
 		$NodeName =~ s/([^^])\:/$1\$/;
-		
-		warn "found element: $NodeName" if $Self->{debug};
-		
+
+		warn "Found element: $NodeName" if $Self->{debug};
+
 		# force array: all children are accessed through an arrayref, even if there is only one child
 		# I don't think I like this, but it's more predictable than array folding
-		if ($Self->{force_array})
+		if ( $Self->{force_array} )
 		{
-			warn "forcing \"$NodeName\" element into an array" if $Self->{debug};
+			warn "Forcing \"$NodeName\" element into an array" if $Self->{debug};
 			$CurrentObj->{$NodeName} = [] unless $CurrentObj->{$NodeName};
-			push @{$CurrentObj->{$NodeName}}, $ElementHash;
+			push @{ $CurrentObj->{$NodeName} }, $ElementHash;
 		}
+
 		# otherwise, use array folding
 		else
 		{
+
 			# check to see if a sibling element of this node name has already been added to the current object block
-			if (exists $CurrentObj->{$NodeName})
+			if ( exists $CurrentObj->{$NodeName} )
 			{
-				my $NodeType = ref($CurrentObj->{$NodeName});
-				
-				if ($NodeType eq 'HASH')
+				my $NodeType = ref( $CurrentObj->{$NodeName} );
+
+				if ( $NodeType eq 'HASH' )
 				{
+
 					# an element was already added, but it is not in an array
 					# so take the sibling element and wrap it inside of an array
-					
-					warn "found the second \"$NodeName\" child element. Now wrapping it into an arrayref" if $Self->{debug};
-					$CurrentObj->{$NodeName} = [$CurrentObj->{$NodeName}];
+
+					warn "Found the second \"$NodeName\" child element." . " Now wrapping it into an arrayref"
+					  if $Self->{debug};
+					$CurrentObj->{$NodeName} = [ $CurrentObj->{$NodeName} ];
 				}
-				if ($NodeType eq '')
+				if ( $NodeType eq '' )
 				{
+
 					# oops, it looks like an attribute of the same name was already added
 					# ($Self->{attribute_prefix} eq "")
 					# the attribute is going to get overwritten :(
-					
-					warn "The \"$NodeName\" attribute conflicts with a child element of the same name. The attribute has been lost! Try setting the attribute_prefix arg to something like '\@' to avoid this" if $Self->{debug};
+
+					warn "The \"$NodeName\" attribute conflicts with a child element of the same name."
+					  . " The attribute has been lost!"
+					  . " Try setting the attribute_prefix arg to something like '\@' to avoid this"    
+					  if $Self->{debug};
 					$CurrentObj->{$NodeName} = [];
 				}
-				
+
 				# add the current element to the array
-				warn "adding the \"$NodeName\" child element to the array" if $Self->{debug};
-				push @{$CurrentObj->{$NodeName}}, $ElementHash;
+				warn "Adding the \"$NodeName\" child element to the array" if $Self->{debug};
+				push @{ $CurrentObj->{$NodeName} }, $ElementHash;
 			}
+
 			# this is the first element found for this node name, so just add the hash
 			# this will simplify data access for elements that only have a single child of the same name
 			else
 			{
-				warn "found the first \"$NodeName\" child element. This element may be accessed directly through its hashref" if $Self->{debug};
+				warn "Found the first \"$NodeName\" child element."
+				  . " This element may be accessed directly through its hashref"
+				  if $Self->{debug};
 				$CurrentObj->{$NodeName} = $ElementHash;
 			}
-		}	
-		
+		}
+
 		# grab any text content
 		my $Text = $Child->findvalue('text()');
 		$Text = undef unless $Text =~ /\S/;
-		$ElementHash->{$Self->{content_key}} = $Text if $Text;
-		
+		$ElementHash->{ $Self->{content_key} } = $Text if $Text;
+
 		# add the attributes
 		my @Attributes = $Child->findnodes('@*');
 		if (@Attributes)
 		{
 			foreach my $Attr (@Attributes)
 			{
-				my $AttrName = $Self->{attribute_prefix} . $Attr->nodeName;
+				my $AttrName  = $Self->{attribute_prefix} . $Attr->nodeName;
 				my $AttrValue = $Attr->nodeValue;
-				
+
 				# prefix the attribute name so that the name cannot conflict with child element names
-				warn "adding attribute to the \"$NodeName\" element: $AttrName" if $Self->{debug};
+				warn "Adding attribute to the \"$NodeName\" element: $AttrName" if $Self->{debug};
 				$ElementHash->{$AttrName} = $AttrValue;
 			}
 		}
-		
+
 		# look for more children
-		$Self->_process_children($Child, $ElementHash);
+		$Self->_process_children( $Child, $ElementHash );
 	}
-	
+
 	return;
 }
 
@@ -448,82 +481,105 @@ arguments which are set when calling the "new" method.
 
 sub sanitize
 {
-	my ($Self, $Obj) = @_;
-	
+	my ( $Self, $Obj ) = @_;
+
 	my $ObjType = ref($Obj) || 'scalar';
-	warn "That's not a hashref! ($ObjType)" unless $ObjType eq 'HASH';
-	
+	carp "That's not a hashref! ($ObjType)" unless $ObjType eq 'HASH';
+
 	# process each hash key
-	KEYS: foreach my $Key (keys %$Obj)
+  KEYS: foreach my $Key ( keys %$Obj )
 	{
-		my $KeyType = ref($Obj->{$Key});
-		
+		my $KeyType = ref( $Obj->{$Key} );
+
 		# this is an element
-		if ($KeyType eq 'HASH')
+		if ( $KeyType eq 'HASH' )
 		{
+
 			# check to see if this element is private
-			foreach my $PrivateElement (@{$Self->{private_elements}})
+			foreach my $PrivateElement ( @{ $Self->{private_elements} } )
 			{
-				if ($Key eq $PrivateElement)
+				if ( $Key eq $PrivateElement )
 				{
+
 					# this is a private element, so delete it
-					warn "deleting private element: $Key" if $Self->{debug};
+					warn "Deleting private element: $Key" if $Self->{debug};
 					delete $Obj->{$Key};
+
 					# the element gone, so move on to the next hash key
 					next KEYS;
 				}
 			}
-			
+
 			# check to see if this element should be blanked out
-			foreach my $EmptyElement (@{$Self->{empty_elements}})
+			foreach my $EmptyElement ( @{ $Self->{empty_elements} } )
 			{
-				if ($Key eq $EmptyElement)
+				if ( $Key eq $EmptyElement )
 				{
-					my @Attributes = keys %{$Obj->{$Key}};
-					
+					my @Attributes = keys %{ $Obj->{$Key} };
+
 					foreach my $Attribute (@Attributes)
 					{
-						unless (ref($Obj->{$Key}->{$Attribute}))
+						unless ( ref( $Obj->{$Key}->{$Attribute} ) )
 						{
-							warn "deleting attribute from \"$Key\" element: $Attribute" if $Self->{debug};
+							warn "Deleting attribute from \"$Key\" element: $Attribute" if $Self->{debug};
 							delete $Obj->{$Key}->{$Attribute};
 						}
 					}
 				}
 			}
-			
+
 			# this hash key is OK, now try to go deeper
-			$Self->sanitize($Obj->{$Key});
+			$Self->sanitize( $Obj->{$Key} );
 		}
+
 		# this is an array of child elements
-		elsif ($KeyType eq 'ARRAY')
+		elsif ( $KeyType eq 'ARRAY' )
 		{
+
+			# check to see if this element is private
+			foreach my $PrivateElement ( @{ $Self->{private_elements} } )
+			{
+				if ( $Key eq $PrivateElement )
+				{
+
+					# this is a private element, so delete it
+					warn "Deleting private element: $Key" if $Self->{debug};
+					delete $Obj->{$Key};
+
+					# the element gone, so move on to the next hash key
+					next KEYS;
+				}
+			}
+
 			# process each child element
-			foreach my $Element (@{$Obj->{$Key}})
+			foreach my $Element ( @{ $Obj->{$Key} } )
 			{
 				$Self->sanitize($Element);
 			}
 		}
+
 		# this is an attribute
-		elsif (!$KeyType)
+		elsif ( !$KeyType )
 		{
+
 			# check to see if any of the attributes are private
-			foreach my $PrivateAttribute (@{$Self->{private_attributes}})
+			foreach my $PrivateAttribute ( @{ $Self->{private_attributes} } )
 			{
-				if ($Key eq $Self->{attribute_prefix} . $PrivateAttribute)
+				if ( $Key eq $Self->{attribute_prefix} . $PrivateAttribute )
 				{
+
 					# this is a private attribute, so delete it
-					warn "deleting private attribute: $Key" if $Self->{debug};
+					warn "Deleting private attribute: $Key" if $Self->{debug};
 					delete $Obj->{$Key};
 				}
 			}
 		}
 		else
 		{
-			die "Invalid data type for key: $Key (data type: $KeyType)";
+			croak "Invalid data type for key: $Key (data type: $KeyType)";
 		}
 	}
-	
+
 	return;
 }
 
@@ -541,12 +597,12 @@ Calling this method is the same as:
 
 sub json2xml
 {
-	my ($Self, $JSON) = @_;
-	
+	my ( $Self, $JSON ) = @_;
+
 	my $Obj = $Self->json2obj($JSON);
-	
+
 	my $XML = $Self->obj2xml($Obj);
-	
+
 	return $XML;
 }
 
@@ -559,39 +615,39 @@ Returns an equivalent perl data structure.
 
 sub json2obj
 {
-	my ($Self, $JSON) = @_;
-	
+	my ( $Self, $JSON ) = @_;
+
 	my $Obj;
-	
-	warn "converting json to obj using $Self->{_loaded_module}" if $Self->{debug};
-	
-	if ($Self->{_loaded_module} eq 'JSON::Syck')
+
+	carp "Converting json to obj using $Self->{_loaded_module}" if $Self->{debug};
+
+	if ( $Self->{_loaded_module} eq 'JSON::Syck' )
 	{
 		$Obj = JSON::Syck::Load($JSON);
 	}
-	
-	if ($Self->{_loaded_module} eq 'JSON::XS')
+
+	if ( $Self->{_loaded_module} eq 'JSON::XS' )
 	{
 		$Obj = JSON::XS->new->utf8->decode($JSON);
 	}
-	
-	if ($Self->{_loaded_module} eq 'JSON')
+
+	if ( $Self->{_loaded_module} eq 'JSON' )
 	{
-		$Obj = jsonToObj($JSON);
+		$Obj = JSON::from_json($JSON);
 	}
-	
-	if ($Self->{_loaded_module} eq 'JSON::DWIW')
+
+	if ( $Self->{_loaded_module} eq 'JSON::DWIW' )
 	{
 		$Obj = JSON::DWIW->from_json($JSON);
 	}
-	
+
 	return $Obj;
 }
 
-=head2 obj2xml
+=head2 obj2dom
 
 Takes a perl data structure as input. (Must be a hashref.)
-Returns an equivalent xml string.
+Returns an XML::LibXML::Document object.
 
 This method expects the object to be in the same format as 
 would be returned by the xml2obj method.
@@ -630,108 +686,152 @@ Caveats:
 
 =cut
 
-sub obj2xml
+sub obj2dom
 {
-	my ($Self, $Obj) = @_;
-	
-	die "object must be a hashref" unless ref($Obj) eq 'HASH';
-	
-	my $Version  = $Obj->{$Self->{attribute_prefix} . 'version'}  || $Obj->{'version'}  || '1.0';
-	my $Encoding = $Obj->{$Self->{attribute_prefix} . 'encoding'} || $Obj->{'encoding'} || 'UTF-8';
-	
-	my $Dom = $XMLPARSER->createDocument($Version, $Encoding);
-	
+	my ( $Self, $Obj ) = @_;
+
+	croak "Object must be a hashref" unless ref($Obj) eq 'HASH';
+
+	my $Version  = $Obj->{ $Self->{attribute_prefix} . 'version' }  || $Obj->{'version'}  || '1.0';
+	my $Encoding = $Obj->{ $Self->{attribute_prefix} . 'encoding' } || $Obj->{'encoding'} || 'UTF-8';
+
+	my $Dom = $XMLPARSER->createDocument( $Version, $Encoding );
+
 	my $GotRoot = 0;
-	
-	foreach my $Key (keys %$Obj)
+
+	foreach my $Key ( keys %$Obj )
 	{
-		my $KeyType = ref($Obj->{$Key});
-		
+		my $KeyType = ref( $Obj->{$Key} );
+
+		warn "Key type for $Key is: " . $KeyType . " (value seems to be $Obj->{$Key})" if $Self->{debug};
+
 		my $Name = $Key;
-		
+
 		# replace a "$" in the name with a ":"
 		$Name =~ s/([^^])\$/$1\:/;
-		
-		if ($KeyType eq 'HASH')
+
+		if ( $KeyType eq 'HASH' )
 		{
-			warn "creating root element: $Name" if $Self->{debug};
-			
-			die "You may only have one root element" if $GotRoot;
+			warn "Creating root element: $Name" if $Self->{debug};
+
+			croak "You may only have one root element: $Key" if $GotRoot;
 			$GotRoot = 1;
-			
+
 			my $Root = $Dom->createElement($Name);
 			$Dom->setDocumentElement($Root);
-			
-			$Self->_process_element_hash($Dom, $Root, $Obj->{$Key});
+
+			$Self->_process_element_hash( $Dom, $Root, $Obj->{$Key} );
+		}
+		elsif ( $KeyType eq 'ARRAY' )
+		{
+			croak "You cant have an array of root nodes: $Key";
+		}
+		elsif ( !$KeyType )
+		{
+			if ( $Obj->{$Key} ne '' )
+			{
+				unless ($GotRoot)
+				{
+					my $Root = $Dom->createElement($Name);
+					$Dom->setDocumentElement($Root);
+					$Root->appendText( $Obj->{$Key} );
+					$GotRoot = 1;
+				}
+			}
+			else
+			{
+				croak "Invalid data for key: $Key";
+			}
 		}
 	}
-	
-	my $XML = $Dom->toString($Self->{pretty} ? 2 : 0);
-	
+
+	return $Dom;
+}
+
+=head2 obj2xml
+
+This method takes the same arguments as obj2dom.
+Returns the XML as a string.
+
+=cut
+
+sub obj2xml
+{
+	my ( $Self, $Obj ) = @_;
+
+	my $Dom = $Self->obj2dom($Obj);
+
+	my $XML = $Dom->toString( $Self->{pretty} ? 2 : 0 );
+
 	return $XML;
 }
 
 sub _process_element_hash
 {
-	my ($Self, $Dom, $Element, $Obj) = @_;
-	
-	foreach my $Key (keys %$Obj)
+	my ( $Self, $Dom, $Element, $Obj ) = @_;
+
+	foreach my $Key ( keys %$Obj )
 	{
-		my $KeyType = ref($Obj->{$Key});
-		
+		my $KeyType = ref( $Obj->{$Key} );
+
 		my $Name = $Key;
-		
+
 		# replace a "$" in the name with a ":"
 		$Name =~ s/([^^])\$/$1\:/;
-		
-		if ($KeyType eq 'ARRAY')
+
+		if ( $KeyType eq 'ARRAY' )
 		{
-			foreach my $ChildObj (@{$Obj->{$Key}})
+			foreach my $ChildObj ( @{ $Obj->{$Key} } )
 			{
-				warn "creating element: $Name" if $Self->{debug};
-				
+				warn "Creating element: $Name" if $Self->{debug};
+
 				my $Child = $Dom->createElement($Name);
 				$Element->addChild($Child);
-				
-				$Self->_process_element_hash($Dom, $Child, $ChildObj);
+
+				$Self->_process_element_hash( $Dom, $Child, $ChildObj );
 			}
 		}
-		elsif ($KeyType eq 'HASH')
+		elsif ( $KeyType eq 'HASH' )
 		{
-			warn "creating element: $Name" if $Self->{debug};
-			
+			warn "Creating element: $Name" if $Self->{debug};
+
 			my $Child = $Dom->createElement($Name);
 			$Element->addChild($Child);
-			
-			$Self->_process_element_hash($Dom, $Child, $Obj->{$Key});
+
+			$Self->_process_element_hash( $Dom, $Child, $Obj->{$Key} );
 		}
-		elsif (!$KeyType)
+		elsif ( !$KeyType )
 		{
-			if ($Key eq $Self->{content_key})
+			if ( $Key eq $Self->{content_key} )
 			{
-				warn "appending text to: $Name" if $Self->{debug};
+				warn "Appending text to: $Name" if $Self->{debug};
 				
-				$Element->appendText($Obj->{$Key});
+				my $Value = $Obj->{$Key} || q{};
+
+				$Element->appendText( $Value );
 			}
 			else
 			{
+
 				# remove the attribute prefix
 				my $AttributePrefix = $Self->{attribute_prefix};
-				if ($Name =~ /^\Q$AttributePrefix\E(.+)/)
+				if ( $Name =~ /^\Q$AttributePrefix\E(.+)/ )
 				{
 					$Name = $1;
 				}
 				
-				warn "creating attribute: $Name" if $Self->{debug};
-				$Element->setAttribute($Name, $Obj->{$Key});
+				my $Value = $Obj->{$Key} || q{};
+
+				warn "Creating attribute: $Name" if $Self->{debug};
+				$Element->setAttribute( $Name, $Value );
 			}
 		}
 		else
 		{
-			die "Invalid data type for key: $Key (data type: $KeyType)";
+			croak "Invalid data type for key: $Key (data type: $KeyType)";
 		}
 	}
-	
+
 	return;
 }
 
@@ -741,7 +841,7 @@ Ken Prows - perl(AT)xev.net
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright (C) 2007 Ken Prows
+Copyright (C) 2007-2008 Ken Prows
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
@@ -749,3 +849,4 @@ it under the same terms as Perl itself.
 =cut
 
 1;
+

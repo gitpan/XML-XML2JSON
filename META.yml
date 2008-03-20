@@ -16,4 +16,4 @@ no_index:
     - t
 requires: 
   XML::LibXML: 1.59
-version: 0.03
+version: 0.04
