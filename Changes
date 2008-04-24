@@ -1,5 +1,9 @@
 Revision history for Perl extension XML::XML2JSON.
 
+0.05
+    - Re-factored and improved the efficiency of the sanitize method
+    - BUG#35335 - fixed a problem with auto-loading of JSON modules
+
 0.04  Mar 20, 2008
     - Added obj2dom and dom2obj methods
     - When using the JSON module, 

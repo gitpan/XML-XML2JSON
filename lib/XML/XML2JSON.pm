@@ -1,6 +1,6 @@
 package XML::XML2JSON;
 use strict;
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Carp;
 use XML::LibXML;
@@ -137,9 +137,9 @@ sub _init
 	if ( $Args{module} )
 	{
 		my $OK = 0;
-		for (@Modules)
+		foreach my $Module ( @Modules )
 		{
-			$OK = 1 if $_ eq $Args{module};
+			$OK = 1 if $Module eq $Args{module};
 		}
 		croak "Unsupported module: $Args{module}" unless $OK;
 		@Modules = ( $Args{module} );
@@ -147,32 +147,17 @@ sub _init
 
 	$Self->{_loaded_module} = "";
 
-	do
+	foreach my $Module ( @Modules )
 	{
-		my $Module = shift @Modules;
-
-		last unless $Module;
-
 		eval "use $Module (); 1;";
-		$Self->{_loaded_module} = $Module unless $@;
-	} until ( $Self->{_loaded_module} );
+		unless ($@)
+		{
+			$Self->{_loaded_module} = $Module;
+			last;
+		}
+	}
 
 	croak "Cannot find a suitable JSON module" unless $Self->{_loaded_module};
-
-	# sanitize options
-	$Self->{private_elements}   = $Args{private_elements}   ? $Args{private_elements}   : [];
-	$Self->{empty_elements}     = $Args{empty_elements}     ? $Args{empty_elements}     : [];
-	$Self->{private_attributes} = $Args{private_attributes} ? $Args{private_attributes} : [];
-
-	# element names must account for the : -> $ switch
-	for ( my $i = 0 ; $i < @{ $Self->{private_elements} } ; $i++ )
-	{
-		$Self->{private_elements}->[$i] =~ s/([^^])\:/$1\$/;
-	}
-	for ( my $i = 0 ; $i < @{ $Self->{empty_elements} } ; $i++ )
-	{
-		$Self->{empty_elements}->[$i] =~ s/([^^])\:/$1\$/;
-	}
 
 	# force arrays (this turns off array folding)
 	$Self->{force_array} = $Args{force_array} ? 1 : 0;
@@ -186,7 +171,43 @@ sub _init
 	# names
 	$Self->{attribute_prefix} = defined $Args{attribute_prefix} ? $Args{attribute_prefix} : '@';
 	$Self->{content_key}      = defined $Args{content_key}      ? $Args{content_key}      : '$t';
-
+	
+	#
+	# sanitize options
+	#
+	# private_elements
+	$Self->{private_elements} = {};
+	if ($Args{private_elements})
+	{
+		foreach my $private_element ( @{$Args{private_elements}} )
+		{
+			# this must account for the ":" to "$" switch
+			$private_element =~ s/([^^])\:/$1\$/;
+			$Self->{private_elements}->{$private_element} = 1;
+		}
+	}
+	# empty_elements
+	$Self->{empty_elements} = {};
+	if ($Args{empty_elements})
+	{
+		foreach my $empty_element ( @{$Args{empty_elements}} )
+		{
+			# this must account for the ":" to "$" switch
+			$empty_element =~ s/([^^])\:/$1\$/;
+			$Self->{empty_elements}->{$empty_element} = 1;
+		}
+	}
+	# private_attributes
+	$Self->{private_attributes} = {};
+	if ($Args{private_attributes})
+	{
+		foreach my $private_attribute ( @{$Args{private_attributes}} )
+		{
+			# this must account for the attribute_prefix
+			$Self->{private_attributes}->{ $Self->{attribute_prefix} . $private_attribute } = 1;
+		}
+	}
+	
 	return;
 }
 
@@ -209,7 +230,7 @@ sub convert
 
 	my $Obj = $Self->xml2obj($XML);
 
-	if ( @{ $Self->{private_elements} } || @{ $Self->{empty_elements} } || @{ $Self->{private_attributes} } )
+	if ( %{ $Self->{private_elements} } || %{ $Self->{empty_elements} } || %{ $Self->{private_attributes} } )
 	{
 		$Self->sanitize($Obj);
 	}
@@ -492,28 +513,24 @@ sub sanitize
 		my $KeyType = ref( $Obj->{$Key} );
 
 		# this is an element
-		if ( $KeyType eq 'HASH' )
+		if ( $KeyType eq 'HASH' || $KeyType eq 'ARRAY' )
 		{
-
 			# check to see if this element is private
-			foreach my $PrivateElement ( @{ $Self->{private_elements} } )
+			if ( $Self->{private_elements}->{$Key} )
 			{
-				if ( $Key eq $PrivateElement )
-				{
-
-					# this is a private element, so delete it
-					warn "Deleting private element: $Key" if $Self->{debug};
-					delete $Obj->{$Key};
-
-					# the element gone, so move on to the next hash key
-					next KEYS;
-				}
+				# this is a private element, so delete it
+				warn "Deleting private element: $Key" if $Self->{debug};
+				delete $Obj->{$Key};
+			
+				# the element is gone, move on to the next hash key
+				next KEYS;
 			}
 
-			# check to see if this element should be blanked out
-			foreach my $EmptyElement ( @{ $Self->{empty_elements} } )
+			# the element is a hash
+			if ( $KeyType eq 'HASH' )
 			{
-				if ( $Key eq $EmptyElement )
+				# check to see if this element should be blanked out
+				if ( $Self->{empty_elements}->{$Key} )
 				{
 					my @Attributes = keys %{ $Obj->{$Key} };
 
@@ -526,52 +543,30 @@ sub sanitize
 						}
 					}
 				}
+				
+				# go deeper
+				$Self->sanitize( $Obj->{$Key} );
 			}
-
-			# this hash key is OK, now try to go deeper
-			$Self->sanitize( $Obj->{$Key} );
-		}
-
-		# this is an array of child elements
-		elsif ( $KeyType eq 'ARRAY' )
-		{
-
-			# check to see if this element is private
-			foreach my $PrivateElement ( @{ $Self->{private_elements} } )
+			
+			# this is an array of child elements
+			if ( $KeyType eq 'ARRAY' )
 			{
-				if ( $Key eq $PrivateElement )
+				# process each child element
+				foreach my $Element ( @{ $Obj->{$Key} } )
 				{
-
-					# this is a private element, so delete it
-					warn "Deleting private element: $Key" if $Self->{debug};
-					delete $Obj->{$Key};
-
-					# the element gone, so move on to the next hash key
-					next KEYS;
+					$Self->sanitize($Element);
 				}
 			}
-
-			# process each child element
-			foreach my $Element ( @{ $Obj->{$Key} } )
-			{
-				$Self->sanitize($Element);
-			}
 		}
-
 		# this is an attribute
 		elsif ( !$KeyType )
 		{
-
-			# check to see if any of the attributes are private
-			foreach my $PrivateAttribute ( @{ $Self->{private_attributes} } )
+			# check to see if the attribute is private
+			if ( $Self->{private_attributes}->{$Key} )
 			{
-				if ( $Key eq $Self->{attribute_prefix} . $PrivateAttribute )
-				{
-
-					# this is a private attribute, so delete it
-					warn "Deleting private attribute: $Key" if $Self->{debug};
-					delete $Obj->{$Key};
-				}
+				# this is a private attribute, so delete it
+				warn "Deleting private attribute: $Key" if $Self->{debug};
+				delete $Obj->{$Key};
 			}
 		}
 		else

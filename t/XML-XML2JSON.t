@@ -19,8 +19,13 @@ my $XML = qq|<?xml version="1.0" encoding="UTF-8" ?>
 <test>
 	<data attr1="test">some test text</data>
 	<empty a="b"><inner c="d"/></empty>
-	<private/>
+	<private some="value" />
 	<censored foo="secret"/>
+	<array perl="awesome" hidden="secret">
+		<item index="0"/>
+		<item index="1"/>
+		<item index="2"/>
+	</array>
 </test>
 |;
 
@@ -58,10 +63,12 @@ sub check_module
 				module => $Module, 
 				empty_elements => [qw( empty )],
 				private_elements => [qw( private )],
-				private_attributes => [qw( foo )],
+				private_attributes => [qw( foo hidden )],
 				debug => 0,
 			);
 			my $JSON = $XML2JSON->convert($XML);
+			
+			diag "JSON from $Module: $JSON\n";
 			
 			# check attribute
 			die "$Module: attribute test failed" unless $JSON =~ /["']\@attr1["']\s*:\s*["']test["']/;
@@ -71,11 +78,16 @@ sub check_module
 			
 			my $Object = $XML2JSON->json2obj($JSON);
 			
+			# make sure arrays work
+			die "did not create array of elements correctly" 
+				unless $Object->{test}->{array}->{item}->[2]->{'@index'} eq '2';
+			
 			# test sanitize
 			die "$Module: private element was not removed" if $Object->{test}->{private};
 			die "$Module: empty element is not empty" if grep /^\@/, keys %{$Object->{test}->{empty}};
 			die "$Module: empty element destroyed child" unless $Object->{test}->{empty}->{inner};
-			die "$Module: private attribute was not removed" if $Object->{test}->{censored}->{foo};
+			die "$Module: private attribute \@foo was not removed" if $Object->{test}->{censored}->{'@foo'};
+			die "$Module: private attribute \@hidden was not removed" if $Object->{test}->{array}->{'@hidden'};
 		};
 		if ($@)
 		{
