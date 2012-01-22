@@ -1,5 +1,10 @@
 Revision history for Perl extension XML::XML2JSON.
 
+0.06  Jan 21, 2012
+    - BUG#66830 - Applied patch from rutgeraldo. This patch fixed problems with xmlns declarations.
+    - BUG#66311 - Values of zero were being converted to empty strings.
+    - BUG#72839 - Can now handle json true/false values.
+
 0.05
     - Re-factored and improved the efficiency of the sanitize method
     - BUG#35335 - fixed a problem with auto-loading of JSON modules

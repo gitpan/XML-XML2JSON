@@ -1,6 +1,6 @@
 package XML::XML2JSON;
 use strict;
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Carp;
 use XML::LibXML;
@@ -101,8 +101,10 @@ This is the name of the hash key that text content will be added to. This is "$t
 
 =head3 force_array
 
-If set to true, elements that appear only once can be 
-accessed directly by its hash, instead of being added to an array.
+If set to true, child elements that appear only once will be added to a one element array.
+If set to false, child elements that appear only once will be assesible as a hash value.
+
+The default is false.
 
 =head3 pretty
 
@@ -158,6 +160,8 @@ sub _init
 	}
 
 	croak "Cannot find a suitable JSON module" unless $Self->{_loaded_module};
+
+    warn "loaded module: $Self->{_loaded_module}";
 
 	# force arrays (this turns off array folding)
 	$Self->{force_array} = $Args{force_array} ? 1 : 0;
@@ -272,7 +276,6 @@ sub obj2json
 
 	if ( $Self->{_loaded_module} eq 'JSON::Syck' )
 	{
-
 		# this module does not have a "pretty" option
 		$JSON = JSON::Syck::Dump($Obj);
 	}
@@ -340,7 +343,7 @@ sub dom2obj
 	# grab any text content
 	my $Text = $Root->findvalue('text()');
 	$Text = undef unless $Text =~ /\S/;
-	$Obj->{ $Self->{content_key} } = $Text if $Text;
+	$Obj->{ $Self->{content_key} } = $Text if defined($Text);
 
 	# process attributes
 	my @Attributes = $Root->findnodes('@*');
@@ -352,6 +355,18 @@ sub dom2obj
 			my $AttrValue = $Attr->nodeValue;
 
 			$Obj->{ $Self->{attribute_prefix} . $AttrName } = $AttrValue;
+		}
+	}
+	my @Namespaces = $Root->getNamespaces();
+	if (@Namespaces)
+	{
+		foreach my $Ns (@Namespaces)
+		{
+			my $Prefix = $Ns->declaredPrefix;			
+			my $URI = $Ns->declaredURI;
+			$Prefix = ":$Prefix" if $Prefix;
+			$Obj->{ $Self->{attribute_prefix} . 'xmlns' . $Prefix } = $URI;
+			warn "xmlns$Prefix=\"$URI\"" if $Self->{debug};
 		}
 	}
 
@@ -386,7 +401,6 @@ sub _process_children
 
 	foreach my $Child (@Children)
 	{
-
 		# this will contain the data for the current element (including its children)
 		my $ElementHash = {};
 
@@ -459,7 +473,7 @@ sub _process_children
 		# grab any text content
 		my $Text = $Child->findvalue('text()');
 		$Text = undef unless $Text =~ /\S/;
-		$ElementHash->{ $Self->{content_key} } = $Text if $Text;
+		$ElementHash->{ $Self->{content_key} } = $Text if defined($Text);
 
 		# add the attributes
 		my @Attributes = $Child->findnodes('@*');
@@ -475,6 +489,18 @@ sub _process_children
 				$ElementHash->{$AttrName} = $AttrValue;
 			}
 		}
+		my @Namespaces = $Child->getNamespaces();
+		if (@Namespaces)
+		{
+			foreach my $Ns (@Namespaces)
+			{
+				my $Prefix = $Ns->declaredPrefix;			
+				my $URI = $Ns->declaredURI;
+				$Prefix = ":$Prefix" if $Prefix;
+				$ElementHash->{ $Self->{attribute_prefix} . 'xmlns' . $Prefix } = $URI;
+				warn "xmlns$Prefix=\"$URI\"" if $Self->{debug};
+			}
+		}		
 
 		# look for more children
 		$Self->_process_children( $Child, $ElementHash );
@@ -694,18 +720,21 @@ sub obj2dom
 
 	my $GotRoot = 0;
 
+ 	#delete @$Obj{ grep { /^$Self->{attribute_prefix}/ } keys %$Obj };
+	
 	foreach my $Key ( keys %$Obj )
 	{
-		my $KeyType = ref( $Obj->{$Key} );
-
-		warn "Key type for $Key is: " . $KeyType . " (value seems to be $Obj->{$Key})" if $Self->{debug};
+	    $Obj->{$Key} = "" unless defined($Obj->{$Key});
+	    
+		my $RefType = ref( $Obj->{$Key} );
+		warn "Value ref type for $Key is: $RefType (value seems to be $Obj->{$Key})" if $Self->{debug};
 
 		my $Name = $Key;
 
 		# replace a "$" in the name with a ":"
 		$Name =~ s/([^^])\$/$1\:/;
 
-		if ( $KeyType eq 'HASH' )
+		if ( $RefType eq 'HASH' )
 		{
 			warn "Creating root element: $Name" if $Self->{debug};
 
@@ -717,26 +746,34 @@ sub obj2dom
 
 			$Self->_process_element_hash( $Dom, $Root, $Obj->{$Key} );
 		}
-		elsif ( $KeyType eq 'ARRAY' )
+		elsif ( $RefType eq 'ARRAY' )
 		{
 			croak "You cant have an array of root nodes: $Key";
 		}
-		elsif ( !$KeyType )
-		{
-			if ( $Obj->{$Key} ne '' )
-			{
+		elsif ( !$RefType )
+		{		
+            if ( $Obj->{$Key} ne '' )
+            {
 				unless ($GotRoot)
 				{
-					my $Root = $Dom->createElement($Name);
+					my $Root;
+					eval { $Root = $Dom->createElement($Name) };
+					if ( $@ ) {
+						die "Problem creating root element $Name: $@";
+					}
 					$Dom->setDocumentElement($Root);
 					$Root->appendText( $Obj->{$Key} );
 					$GotRoot = 1;
 				}
-			}
-			else
-			{
-				croak "Invalid data for key: $Key";
-			}
+            }
+            else
+            {
+              croak "Invalid data for key: $Key";
+            }
+		}
+		else
+		{
+		    warn "unknown reference: $RefType";
 		}
 	}
 
@@ -767,14 +804,32 @@ sub _process_element_hash
 
 	foreach my $Key ( keys %$Obj )
 	{
-		my $KeyType = ref( $Obj->{$Key} );
+		my $RefType = ref( $Obj->{$Key} );
 
 		my $Name = $Key;
 
 		# replace a "$" in the name with a ":"
 		$Name =~ s/([^^])\$/$1\:/;
+		
+		# true/false hacks
+		if ($RefType eq 'JSON::XS::Boolean')
+		{
+		    $RefType = "";
+		    $Obj->{$Key} = 1 if ("$Obj->{$Key}" eq 'true');
+		    $Obj->{$Key} = "" if ("$Obj->{$Key}" eq 'false');
+		}
+		if ($RefType eq 'JSON::true')
+		{
+		    $RefType = "";
+		    $Obj->{$Key} = 1;
+		}
+		if ($RefType eq 'JSON::false')
+		{
+		    $RefType = "";
+		    $Obj->{$Key} = "";
+		}
 
-		if ( $KeyType eq 'ARRAY' )
+		if ( $RefType eq 'ARRAY' )
 		{
 			foreach my $ChildObj ( @{ $Obj->{$Key} } )
 			{
@@ -786,7 +841,7 @@ sub _process_element_hash
 				$Self->_process_element_hash( $Dom, $Child, $ChildObj );
 			}
 		}
-		elsif ( $KeyType eq 'HASH' )
+		elsif ( $RefType eq 'HASH' )
 		{
 			warn "Creating element: $Name" if $Self->{debug};
 
@@ -795,13 +850,13 @@ sub _process_element_hash
 
 			$Self->_process_element_hash( $Dom, $Child, $Obj->{$Key} );
 		}
-		elsif ( !$KeyType )
+		elsif ( !$RefType )
 		{
 			if ( $Key eq $Self->{content_key} )
 			{
 				warn "Appending text to: $Name" if $Self->{debug};
 				
-				my $Value = $Obj->{$Key} || q{};
+				my $Value = defined($Obj->{$Key}) ? $Obj->{$Key} : q{};
 
 				$Element->appendText( $Value );
 			}
@@ -815,7 +870,7 @@ sub _process_element_hash
 					$Name = $1;
 				}
 				
-				my $Value = $Obj->{$Key} || q{};
+				my $Value = defined($Obj->{$Key}) ? $Obj->{$Key} : q{};
 
 				warn "Creating attribute: $Name" if $Self->{debug};
 				$Element->setAttribute( $Name, $Value );
@@ -823,12 +878,17 @@ sub _process_element_hash
 		}
 		else
 		{
-			croak "Invalid data type for key: $Key (data type: $KeyType)";
+			croak "Invalid value for element $Key (reference type: $RefType)";
 		}
 	}
 
 	return;
 }
+
+=head1 CAVEATS
+
+The order of child elements is not always preserved.
+This is because the conversion to json makes use of hashes in the resulting json.
 
 =head1 AUTHOR
 

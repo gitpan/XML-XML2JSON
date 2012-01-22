@@ -6,6 +6,7 @@
 use strict;
 
 use CPAN;
+use XML::LibXML;
 
 use Test::More tests => 2;
 
@@ -13,10 +14,12 @@ BEGIN { use_ok('XML::XML2JSON') };
 
 #########################
 
+my $PARSER = XML::LibXML->new;
+
 my @Modules = qw(JSON::Syck JSON::XS JSON JSON::DWIW);
 
 my $XML = qq|<?xml version="1.0" encoding="UTF-8" ?>
-<test>
+<test xmlns:test='http://test.example/test'>
 	<data attr1="test">some test text</data>
 	<empty a="b"><inner c="d"/></empty>
 	<private some="value" />
@@ -26,6 +29,7 @@ my $XML = qq|<?xml version="1.0" encoding="UTF-8" ?>
 		<item index="1"/>
 		<item index="2"/>
 	</array>
+	<test:nstest attr1="bar"/>
 </test>
 |;
 
@@ -61,6 +65,7 @@ sub check_module
 			my $XML2JSON = XML::XML2JSON->new
 			( 
 				module => $Module, 
+				pretty => 0,
 				empty_elements => [qw( empty )],
 				private_elements => [qw( private )],
 				private_attributes => [qw( foo hidden )],
@@ -88,6 +93,15 @@ sub check_module
 			die "$Module: empty element destroyed child" unless $Object->{test}->{empty}->{inner};
 			die "$Module: private attribute \@foo was not removed" if $Object->{test}->{censored}->{'@foo'};
 			die "$Module: private attribute \@hidden was not removed" if $Object->{test}->{array}->{'@hidden'};
+			
+			# back to XML...
+			my $xml2 = $XML2JSON->obj2xml($Object);
+			#diag "and back again: $xml2";
+			my $dom = $PARSER->parse_string($xml2);
+			diag "Reconstructed XML: " . $dom->toString();
+			
+			my $item2 = $dom->documentElement->findvalue('array/item[@index=2]/@index');
+		    die "the reconstructed xml is invalid" unless ($item2 eq '2');
 		};
 		if ($@)
 		{
